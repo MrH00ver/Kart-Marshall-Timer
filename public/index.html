@@ -43,11 +43,11 @@
   #timer-progress {
     stroke: green;
     stroke-width: 12;
-    stroke-dasharray: 0 100;
-    transition: stroke-dasharray 0.2s linear, stroke 0.5s;
+    stroke-dasharray: 0 0; /* will be set dynamically */
+    transition: stroke 0.5s linear, stroke-dasharray 0.2s linear;
   }
 
-  /* Lap circle (thinner, inner) */
+  /* Lap circle (inner, thinner) */
   #lap-bg {
     stroke: #333;
     stroke-width: 6;
@@ -56,7 +56,7 @@
   #lap-progress {
     stroke: #F72323;
     stroke-width: 6;
-    stroke-dasharray: 0 100;
+    stroke-dasharray: 0 0; /* will be set dynamically */
     transition: stroke-dasharray 0.2s linear;
   }
 
@@ -97,21 +97,36 @@
 document.addEventListener("DOMContentLoaded", () => {
   let lastLapCount = null;
 
+  // Calculate circumference for smooth progress
+  const timerCircle = document.getElementById("timer-progress");
+  const lapCircle = document.getElementById("lap-progress");
+  const timerRadius = timerCircle.r.baseVal.value;
+  const lapRadius = lapCircle.r.baseVal.value;
+  const timerCirc = 2 * Math.PI * timerRadius;
+  const lapCirc = 2 * Math.PI * lapRadius;
+
+  timerCircle.style.strokeDasharray = `0 ${timerCirc}`;
+  lapCircle.style.strokeDasharray = `0 ${lapCirc}`;
+
   function updateTimerAndLap(driver) {
     const timerEl = document.getElementById("timer");
-    const timerCircle = document.getElementById("timer-progress");
-    const lapCircle = document.getElementById("lap-progress");
     const lapsEl = document.getElementById("laps-completed");
 
-    if (!timerEl || !timerCircle || !lapCircle || !lapsEl) return;
+    if (!timerEl || !lapsEl) return;
 
-    // Timer countdown
     const remainingSeconds = driver.RemainingSeconds || 0;
+    const totalSessionSeconds = 15 * 60; // 15 min session
+
+    // ------------------------
+    // Timer display
+    // ------------------------
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
     timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
 
-    // Timer circle color: green >4min, amber 4–2min, red <=2min
+    // ------------------------
+    // Timer circle color
+    // ------------------------
     if (remainingSeconds <= 120) {
       timerCircle.style.stroke = 'red';
     } else if (remainingSeconds <= 240) {
@@ -120,33 +135,37 @@ document.addEventListener("DOMContentLoaded", () => {
       timerCircle.style.stroke = 'green';
     }
 
-    // Timer circle progress (0–100)
-    const totalSessionSeconds = 15 * 60; // 15-minute session
-    const progressPercent = Math.max(0, Math.min(100, (remainingSeconds / totalSessionSeconds) * 100));
-    timerCircle.style.strokeDasharray = `${progressPercent} 100`;
+    // Timer progress (smooth)
+    const timerProgress = Math.max(0, Math.min(1, remainingSeconds / totalSessionSeconds));
+    timerCircle.style.strokeDasharray = `${timerCirc * timerProgress} ${timerCirc}`;
 
-    // Update laps completed number
+    // ------------------------
+    // Laps completed
+    // ------------------------
     const lapCount = Math.max(0, driver.LapCount || 0);
     lapsEl.textContent = lapCount;
 
-    // Reset lap circle if new lap started
+    // ------------------------
+    // Lap circle
+    // ------------------------
     if (lastLapCount !== lapCount) {
-      lapCircle.style.strokeDasharray = `0 100`; // reset inner circle
+      lapCircle.style.strokeDasharray = `0 ${lapCirc}`; // reset on new lap
       lastLapCount = lapCount;
     }
 
-    // Fill lap circle based on current lap progress
-    const lapProgress = Math.max(0, Math.min(100, driver.LapProgress || 0));
-    lapCircle.style.strokeDasharray = `${lapProgress} 100`;
+    const lapProgress = Math.max(0, Math.min(1, driver.LapProgress || 0));
+    lapCircle.style.strokeDasharray = `${lapCirc * lapProgress} ${lapCirc}`;
   }
 
-  // Fetch session.json every second
+  // ------------------------
+  // Fetch session JSON every second
+  // ------------------------
   setInterval(async () => {
     try {
       const res = await fetch("/session.json");
       const data = await res.json();
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
-        const driver = data.lastRaceMessage.Drivers[0]; // P1 driver
+        const driver = data.lastRaceMessage.Drivers[0]; // P1
         driver.RemainingSeconds = data.remainingSeconds;
         updateTimerAndLap(driver);
       }
