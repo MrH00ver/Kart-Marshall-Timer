@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kart Marshal Timer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    margin: 0;
+    background: #111;
+    color: white;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, sans-serif;
+}
+
+#status {
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+}
+
+#container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+}
+
+svg { transform: rotate(-90deg); }
+
+circle {
+    fill: none;
+    stroke-linecap: round;
+}
+
+#countdown {
+    stroke-width: 15;
+}
+
+#lapProgress {
+    stroke-width: 4; /* thin inner ring */
+}
+
+#time {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.5rem;
+    font-family: monospace;
+}
+
+#laps {
+    position: absolute;
+    top: 65%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.5rem;
+}
+
+.green { stroke: #00ff7f; }
+.orange { stroke: #ffa500; }
+.red { stroke: #ff4d4d; }
+.gray { stroke: #666; }
+
+#lapProgress { stroke: #00ffff; }
+</style>
+</head>
+
+<body>
+
+<div id="status">RUNNING</div>
+
+<div id="container">
+    <svg width="200" height="200">
+        <circle cx="100" cy="100" r="85" stroke="#333"/>
+        <circle id="countdown" cx="100" cy="100" r="85" class="green"/>
+        <circle id="lapProgress" cx="100" cy="100" r="75" />
+    </svg>
+    <div id="time">15:00</div>
+    <div id="laps">0</div>
+</div>
+
+<script>
+const TOTAL_SECONDS = 900;   // 15 min
+const WARNING_AT = 120;      // 2 min warning
+const TOTAL_LAPS = 20;       // replace with real number if known
+
+let remainingSeconds = TOTAL_SECONDS;
+let warned = false;
+let lastFetchTime = 0;
+let lastRaceMessage = null;
+
+const statusEl = document.getElementById("status");
+const timeEl = document.getElementById("time");
+const lapsEl = document.getElementById("laps");
+const countdownCircle = document.getElementById("countdown");
+const lapCircle = document.getElementById("lapProgress");
+
+const countdownRadius = 85;
+const lapRadius = 75;
+
+const countdownCircumference = 2 * Math.PI * countdownRadius;
+const lapCircumference = 2 * Math.PI * lapRadius;
+
+countdownCircle.style.strokeDasharray = countdownCircumference;
+lapCircle.style.strokeDasharray = lapCircumference;
+
+// format seconds
+function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateCountdownCircle() {
+    const progress = remainingSeconds / TOTAL_SECONDS;
+    countdownCircle.style.strokeDashoffset = countdownCircumference * (1 - progress);
+
+    // only change color if it needs to
+    if (remainingSeconds <= WARNING_AT) countdownCircle.className.baseVal = "red";
+    else if (remainingSeconds <= 300) countdownCircle.className.baseVal = "orange";
+    else countdownCircle.className.baseVal = "green";
+}
+
+function updateLapCircle() {
+    if (lastRaceMessage && lastRaceMessage.Drivers) {
+        const p1 = lastRaceMessage.Drivers.find(d => d.Position === 1);
+        if (p1 && p1.LapCount >= 0) {
+            const lapProgress = p1.LapCount / TOTAL_LAPS;
+            lapCircle.style.strokeDashoffset = lapCircumference * (1 - lapProgress);
+        }
+    }
+}
+
+// fetch session every 15s
+async function fetchSession() {
+    const now = Date.now();
+    if (now - lastFetchTime < 15000) return; // throttle fetch
+    lastFetchTime = now;
+
+    try {
+        const res = await fetch('/session.json');
+        const data = await res.json();
+
+        if (!data.connected) {
+            statusEl.textContent = "DISCONNECTED";
+            countdownCircle.className.baseVal = "gray";
+            lapsEl.textContent = "-";
+            return;
+        }
+
+        if (data.remainingSeconds > 0) remainingSeconds = data.remainingSeconds;
+        statusEl.textContent = data.sessionStatus || "RUNNING";
+
+        if (data.lastRaceMessage && data.lastRaceMessage.Drivers) {
+            lastRaceMessage = data.lastRaceMessage;
+        }
+
+        updateLaps();
+        updateLapCircle();
+    } catch {
+        statusEl.textContent = "ERROR";
+        countdownCircle.className.baseVal = "gray";
+        lapsEl.textContent = "-";
+    }
+}
+
+function updateLaps() {
+    if (lastRaceMessage && lastRaceMessage.Drivers) {
+        const p1 = lastRaceMessage.Drivers.find(d => d.Position === 1);
+        if (p1) lapsEl.textContent = p1.LapCount >= 0 ? p1.LapCount : 0;
+    }
+}
+
+// local countdown tick (once per second)
+setInterval(() => {
+    if (remainingSeconds > 0) remainingSeconds--;
+
+    timeEl.textContent = formatTime(remainingSeconds);
+    updateCountdownCircle();
+    updateLaps();
+    updateLapCircle();
+
+    if (remainingSeconds === WARNING_AT && !warned) warned = true;
+}, 1000);
+
+// initial render
+updateCountdownCircle();
+updateLapCircle();
+timeEl.textContent = formatTime(remainingSeconds);
+lapsEl.textContent = "0";
+statusEl.textContent = "RUNNING";
+
+fetchSession();
+setInterval(fetchSession, 15000);
+</script>
+
+</body>
+</html>
