@@ -34,9 +34,11 @@
     stroke-linecap: round;
   }
 
+  /* Timer circle */
   #timer-bg { stroke: #333; stroke-width: 12; }
   #timer-progress { stroke: green; stroke-width: 12; stroke-dasharray: 0 0; transition: stroke 0.5s linear, stroke-dasharray 0.2s linear; }
 
+  /* Lap progress circle */
   #lap-bg { stroke: #333; stroke-width: 6; }
   #lap-progress { stroke: #00FF00; stroke-width: 6; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
 
@@ -66,6 +68,7 @@
     <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
   </svg>
 
+  <!-- Inner lap circle -->
   <svg style="position:absolute; top:50%; left:50%; width:180px; height:180px; transform: translate(-50%, -50%) rotate(-90deg);">
     <circle id="lap-bg" cx="90" cy="90" r="80"></circle>
     <circle id="lap-progress" cx="90" cy="90" r="80"></circle>
@@ -77,16 +80,17 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  let lastLapCount = null;
-  let localRemainingSeconds = 15 * 60;
-  const fetchInterval = 15000;
+  let localRemainingSeconds = 15 * 60; // fallback if server not fetched yet
+  const fetchInterval = 15000; // fetch every 15 seconds
   let lastFetchTime = 0;
 
-  let lapProgressCurrent = 0; 
-  let lapProgressTarget = 0; 
+  let lapProgressCurrent = 0; // smooth animation
+  let lapProgressTarget = 0; // from server
+  let lastLapCount = null;
 
   const timerCircle = document.getElementById("timer-progress");
   const lapCircle = document.getElementById("lap-progress");
+
   const timerRadius = timerCircle.r.baseVal.value;
   const lapRadius = lapCircle.r.baseVal.value;
   const timerCirc = 2 * Math.PI * timerRadius;
@@ -102,27 +106,29 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/session.json");
       const data = await res.json();
+
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
+        // pick P1 driver
         const p1Driver = data.lastRaceMessage.Drivers.find(d => d.Position === 1);
         if (p1Driver) {
           localRemainingSeconds = data.remainingSeconds;
 
-          // Update laps
+          // update laps display
           const lapCount = Math.max(0, p1Driver.LapCount || 0);
           lapsEl.textContent = lapCount;
 
-          // Only reset lapProgressCurrent if lapCount increased
+          // Reset lapProgressCurrent only if lapCount increased
           if (lastLapCount !== null && lapCount > lastLapCount) {
             lapProgressCurrent = 0;
           }
           lastLapCount = lapCount;
 
           // Update target for smooth interpolation
-          lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0) / 100));
-
-          lastFetchTime = Date.now();
+          lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0)/100));
         }
       }
+
+      lastFetchTime = Date.now();
     } catch (err) {
       console.log("Error fetching session:", err);
     }
@@ -133,6 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
+    // Timer color alerts
     if (localRemainingSeconds <= 120) timerCircle.style.stroke = 'red';
     else if (localRemainingSeconds <= 240) timerCircle.style.stroke = 'orange';
     else timerCircle.style.stroke = 'green';
@@ -143,9 +150,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateLapVisual() {
-    // Smoothly interpolate lap progress each second toward target
+    // smooth interpolation
     const diff = lapProgressTarget - lapProgressCurrent;
-    lapProgressCurrent += diff * 0.2; // interpolation factor
+    lapProgressCurrent += diff * 0.2;
     lapProgressCurrent = Math.min(lapProgressCurrent, lapProgressTarget);
     lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
   }
