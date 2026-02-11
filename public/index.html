@@ -54,7 +54,7 @@
   }
 
   #lap-progress {
-    stroke: #F72323;
+    stroke: #00FF00; /* bright green */
     stroke-width: 6;
     stroke-dasharray: 0 0;
     transition: stroke-dasharray 0.2s linear;
@@ -99,9 +99,14 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   let lastLapCount = null;
-  let localRemainingSeconds = 15 * 60; // fallback start time
-  const fetchInterval = 15000; // fetch from server every 15s
+  let localRemainingSeconds = 15 * 60;
+  const fetchInterval = 15000;
   let lastFetchTime = 0;
+
+  let lapProgressCurrent = 0; // 0 → 1
+  let lapProgressTarget = 0;  // value from server
+  let lapDuration = 10;       // seconds, fallback, will adjust dynamically
+  let lastLapFetchTime = Date.now();
 
   const timerCircle = document.getElementById("timer-progress");
   const lapCircle = document.getElementById("lap-progress");
@@ -124,7 +129,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const p1Driver = data.lastRaceMessage.Drivers.find(d => d.Position === 1);
         if (p1Driver) {
           localRemainingSeconds = data.remainingSeconds;
-          updateDriver(p1Driver);
+
+          // Update laps number
+          const lapCount = Math.max(0, p1Driver.LapCount || 0);
+          lapsEl.textContent = lapCount;
+
+          // Reset lap circle if new lap
+          if (lastLapCount !== lapCount) {
+            lapProgressCurrent = 0; // reset animation
+            lastLapCount = lapCount;
+          }
+
+          // Target lap progress (0 → 1)
+          lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0) / 100));
+
+          // Estimate duration of current lap for smooth animation
+          // Only if progress > 0
+          const elapsed = (Date.now() - lastLapFetchTime)/1000;
+          lapDuration = elapsed / lapProgressTarget || 10;
+
+          lastLapFetchTime = Date.now();
         }
       }
       lastFetchTime = Date.now();
@@ -133,28 +157,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function updateDriver(driver) {
-    // Update laps completed number
-    const lapCount = Math.max(0, driver.LapCount || 0);
-    lapsEl.textContent = lapCount;
-
-    // Reset lap circle if new lap
-    if (lastLapCount !== lapCount) {
-      lapCircle.style.strokeDasharray = `0 ${lapCirc}`; // reset
-      lastLapCount = lapCount;
-    }
-
-    // Update lap circle progress (normalized 0-1)
-    const lapProgressNormalized = Math.max(0, Math.min(1, (driver.LapProgress || 0) / 100));
-    lapCircle.style.strokeDasharray = `${lapCirc * lapProgressNormalized} ${lapCirc}`;
-  }
-
   function updateTimerVisual() {
     const totalSessionSeconds = 15 * 60;
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
-    // Timer color
     if (localRemainingSeconds <= 120) {
       timerCircle.style.stroke = 'red';
     } else if (localRemainingSeconds <= 240) {
@@ -163,15 +170,27 @@ document.addEventListener("DOMContentLoaded", () => {
       timerCircle.style.stroke = 'green';
     }
 
-    // Timer text
     const minutes = Math.floor(localRemainingSeconds / 60);
     const seconds = localRemainingSeconds % 60;
     timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
   }
 
+  function updateLapVisual() {
+    // Increment lap progress smoothly toward target
+    const now = Date.now();
+    const elapsed = (now - lastLapFetchTime)/1000; // seconds since last fetch
+    if (lapProgressTarget > lapProgressCurrent) {
+      const diff = lapProgressTarget - lapProgressCurrent;
+      lapProgressCurrent += diff * 0.1; // simple interpolation
+      lapProgressCurrent = Math.min(lapProgressCurrent, lapProgressTarget);
+    }
+    lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
+  }
+
   setInterval(async () => {
     localRemainingSeconds = Math.max(0, localRemainingSeconds - 1);
     updateTimerVisual();
+    updateLapVisual();
 
     if (Date.now() - lastFetchTime >= fetchInterval) {
       await fetchTime();
