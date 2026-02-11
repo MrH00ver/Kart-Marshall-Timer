@@ -5,138 +5,169 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kart Timer</title>
 <style>
-    body {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: white;
-    }
+  body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: white;
+  }
 
-    #timer-container {
-        position: relative;
-        width: 200px;
-        height: 200px;
-    }
+  #timer-container {
+    position: relative;
+    width: 220px;
+    height: 220px;
+  }
 
-    svg {
-        transform: rotate(-90deg);
-        width: 100%;
-        height: 100%;
-    }
+  svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
 
-    circle {
-        fill: none;
-        stroke-width: 8;
-        stroke: grey;
-        stroke-linecap: round;
-    }
+  circle {
+    fill: none;
+    stroke-width: 12;
+    stroke-linecap: round;
+  }
 
-    #circle-bg {
-        stroke: #333;
-    }
+  /* Timer circle background */
+  #timer-bg {
+    stroke: #333;
+  }
 
-    #circle-progress {
-        stroke: red;
-        stroke-dasharray: 0 100;
-        transition: stroke-dasharray 0.2s linear, stroke 0.5s;
-    }
+  /* Timer circle progress */
+  #timer-progress {
+    stroke: green;
+    stroke-dasharray: 0 100;
+    transition: stroke-dasharray 0.2s linear, stroke 0.5s;
+  }
 
-    #timer {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 2em;
-    }
+  /* Lap circle */
+  #lap-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    width: 160px;
+    height: 160px;
+  }
 
-    #laps-completed {
-        margin-top: 20px;
-        font-size: 1.5em;
-    }
+  #lap-circle circle {
+    stroke-width: 6;
+    stroke: grey;
+    stroke-dasharray: 0 100;
+    transition: stroke-dasharray 0.2s linear;
+  }
+
+  #timer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2em;
+  }
+
+  #laps-completed {
+    margin-top: 20px;
+    font-size: 1.5em;
+  }
 </style>
 </head>
 <body>
 
 <div id="timer-container">
-    <svg>
-        <circle id="circle-bg" cx="100" cy="100" r="90"></circle>
-        <circle id="circle-progress" cx="100" cy="100" r="90"></circle>
-    </svg>
-    <div id="timer">Loading</div>
+  <svg>
+    <circle id="timer-bg" cx="110" cy="110" r="100"></circle>
+    <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
+  </svg>
+
+  <!-- Lap circle inside -->
+  <svg id="lap-circle">
+    <circle id="lap-bg" cx="80" cy="80" r="70"></circle>
+    <circle id="lap-progress" cx="80" cy="80" r="70"></circle>
+  </svg>
+
+  <div id="timer">Loading</div>
 </div>
 
 <div id="laps-completed">0</div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    let lastLapCount = null;
+  let lastLapCount = null;
 
-    function updateTimerAndLap(driver) {
-        const timerEl = document.getElementById("timer");
-        const lapCircle = document.getElementById("circle-progress");
-        const lapsEl = document.getElementById("laps-completed");
+  function updateTimerAndLap(driver) {
+    const timerEl = document.getElementById("timer");
+    const timerCircle = document.getElementById("timer-progress");
+    const lapCircle = document.getElementById("lap-progress");
+    const lapsEl = document.getElementById("laps-completed");
 
-        if (!timerEl || !lapCircle || !lapsEl) return;
+    if (!timerEl || !timerCircle || !lapCircle || !lapsEl) return;
 
-        // ------------------------
-        // Update timer
-        // ------------------------
-        const remainingSeconds = driver.RemainingSeconds || 0;
-        const minutes = Math.floor(remainingSeconds / 60);
-        const seconds = remainingSeconds % 60;
-        timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
+    // ------------------------
+    // Timer countdown
+    // ------------------------
+    const remainingSeconds = driver.RemainingSeconds || 0;
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = remainingSeconds % 60;
+    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
 
-        // ------------------------
-        // Update laps completed
-        // ------------------------
-        const lapCount = Math.max(0, driver.LapCount || 0);
-        lapsEl.textContent = lapCount;
-
-        // ------------------------
-        // Reset circle if new lap started
-        // ------------------------
-        if (lastLapCount !== lapCount) {
-            lapCircle.style.strokeDasharray = `0 100`;
-            lastLapCount = lapCount;
-        }
-
-        // ------------------------
-        // Fill circle according to current lap progress
-        // ------------------------
-        const progress = Math.max(0, Math.min(100, driver.LapProgress || 0));
-        lapCircle.style.strokeDasharray = `${progress} 100`;
-
-        // ------------------------
-        // Change color when 2 minutes left
-        // ------------------------
-        if (remainingSeconds <= 120) {
-            lapCircle.style.stroke = 'green';
-        } else {
-            lapCircle.style.stroke = 'red';
-        }
+    // ------------------------
+    // Timer circle color logic
+    // Green > 4 min, Amber 4–2 min, Red <=2 min
+    // ------------------------
+    if (remainingSeconds <= 120) {
+      timerCircle.style.stroke = 'red';
+    } else if (remainingSeconds <= 240) {
+      timerCircle.style.stroke = 'orange';
+    } else {
+      timerCircle.style.stroke = 'green';
     }
 
+    // Fill timer circle based on remaining percentage
+    const totalSessionSeconds = 15 * 60; // 15 minutes session
+    const progressPercent = Math.max(0, Math.min(100, (remainingSeconds / totalSessionSeconds) * 100));
+    timerCircle.style.strokeDasharray = `${progressPercent} 100`;
+
     // ------------------------
-    // Fetch session JSON every second
+    // Update laps completed
     // ------------------------
-    setInterval(async () => {
-        try {
-            const res = await fetch("/session.json");
-            const data = await res.json();
-            if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
-                const driver = data.lastRaceMessage.Drivers[0]; // P1 driver
-                driver.RemainingSeconds = data.remainingSeconds;
-                updateTimerAndLap(driver);
-            }
-        } catch (err) {
-            console.log("Error fetching session:", err);
-        }
-    }, 1000);
+    const lapCount = Math.max(0, driver.LapCount || 0);
+    lapsEl.textContent = lapCount;
+
+    // ------------------------
+    // Update lap circle (resets each lap)
+    // ------------------------
+    if (lastLapCount !== lapCount) {
+      lapCircle.style.strokeDasharray = `0 100`; // reset
+      lastLapCount = lapCount;
+    }
+
+    const lapProgress = Math.max(0, Math.min(100, driver.LapProgress || 0));
+    lapCircle.style.strokeDasharray = `${lapProgress} 100`;
+  }
+
+  // ------------------------
+  // Fetch session JSON every second
+  // ------------------------
+  setInterval(async () => {
+    try {
+      const res = await fetch("/session.json");
+      const data = await res.json();
+      if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
+        const driver = data.lastRaceMessage.Drivers[0]; // P1 driver
+        driver.RemainingSeconds = data.remainingSeconds;
+        updateTimerAndLap(driver);
+      }
+    } catch (err) {
+      console.log("Error fetching session:", err);
+    }
+  }, 1000);
 });
 </script>
 
