@@ -130,7 +130,7 @@ function updateLapCircle() {
     if (lastRaceMessage && lastRaceMessage.Drivers) {
         const p1 = lastRaceMessage.Drivers.find(d => d.Position === 1);
         if (p1 && p1.LapCount >= 0) {
-            const lapProgress = p1.LapCount / TOTAL_LAPS;
+            const progress = driver.LapProgress; // 0–100 for current lap
             lapCircle.style.strokeDashoffset = lapCircumference * (1 - lapProgress);
         }
     }
