@@ -2,201 +2,142 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Kart Marshal Timer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<title>Kart Timer</title>
 <style>
-body {
-    margin: 0;
-    background: #111;
-    color: white;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-family: Arial, sans-serif;
-}
+    body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #111;
+        color: white;
+    }
 
-#status {
-    font-size: 1.4rem;
-    margin-bottom: 15px;
-}
+    #timer-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+    }
 
-#container {
-    position: relative;
-    width: 200px;
-    height: 200px;
-}
+    svg {
+        transform: rotate(-90deg);
+        width: 100%;
+        height: 100%;
+    }
 
-svg { transform: rotate(-90deg); }
+    circle {
+        fill: none;
+        stroke-width: 8;
+        stroke: grey;
+        stroke-linecap: round;
+    }
 
-circle {
-    fill: none;
-    stroke-linecap: round;
-}
+    #circle-bg {
+        stroke: #333;
+    }
 
-#countdown {
-    stroke-width: 15;
-}
+    #circle-progress {
+        stroke: red;
+        stroke-dasharray: 0 100;
+        transition: stroke-dasharray 0.2s linear, stroke 0.5s;
+    }
 
-#lapProgress {
-    stroke-width: 4; /* thin inner ring */
-}
+    #timer {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2em;
+    }
 
-#time {
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2.5rem;
-    font-family: monospace;
-}
-
-#laps {
-    position: absolute;
-    top: 65%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.5rem;
-}
-
-.green { stroke: #00ff7f; }
-.orange { stroke: #ffa500; }
-.red { stroke: #ff4d4d; }
-.gray { stroke: #666; }
-
-#lapProgress { stroke: #00ffff; }
+    #laps-completed {
+        margin-top: 20px;
+        font-size: 1.5em;
+    }
 </style>
 </head>
-
 <body>
 
-<div id="status">RUNNING</div>
-
-<div id="container">
-    <svg width="200" height="200">
-        <circle cx="100" cy="100" r="85" stroke="#333"/>
-        <circle id="countdown" cx="100" cy="100" r="85" class="green"/>
-        <circle id="lapProgress" cx="100" cy="100" r="75" />
+<div id="timer-container">
+    <svg>
+        <circle id="circle-bg" cx="100" cy="100" r="90"></circle>
+        <circle id="circle-progress" cx="100" cy="100" r="90"></circle>
     </svg>
-    <div id="time">15:00</div>
-    <div id="laps">0</div>
+    <div id="timer">Loading</div>
 </div>
 
+<div id="laps-completed">0</div>
+
 <script>
-const TOTAL_SECONDS = 900;   // 15 min
-const WARNING_AT = 120;      // 2 min warning
-const TOTAL_LAPS = 20;       // replace with real number if known
+document.addEventListener("DOMContentLoaded", () => {
+    let lastLapCount = null;
 
-let remainingSeconds = TOTAL_SECONDS;
-let warned = false;
-let lastFetchTime = 0;
-let lastRaceMessage = null;
+    function updateTimerAndLap(driver) {
+        const timerEl = document.getElementById("timer");
+        const lapCircle = document.getElementById("circle-progress");
+        const lapsEl = document.getElementById("laps-completed");
 
-const statusEl = document.getElementById("status");
-const timeEl = document.getElementById("time");
-const lapsEl = document.getElementById("laps");
-const countdownCircle = document.getElementById("countdown");
-const lapCircle = document.getElementById("lapProgress");
+        if (!timerEl || !lapCircle || !lapsEl) return;
 
-const countdownRadius = 85;
-const lapRadius = 75;
+        // ------------------------
+        // Update timer
+        // ------------------------
+        const remainingSeconds = driver.RemainingSeconds || 0;
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
 
-const countdownCircumference = 2 * Math.PI * countdownRadius;
-const lapCircumference = 2 * Math.PI * lapRadius;
+        // ------------------------
+        // Update laps completed
+        // ------------------------
+        const lapCount = Math.max(0, driver.LapCount || 0);
+        lapsEl.textContent = lapCount;
 
-countdownCircle.style.strokeDasharray = countdownCircumference;
-lapCircle.style.strokeDasharray = lapCircumference;
-
-// format seconds
-function formatTime(sec) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-
-function updateCountdownCircle() {
-    const progress = remainingSeconds / TOTAL_SECONDS;
-    countdownCircle.style.strokeDashoffset = countdownCircumference * (1 - progress);
-
-    // only change color if it needs to
-    if (remainingSeconds <= WARNING_AT) countdownCircle.className.baseVal = "red";
-    else if (remainingSeconds <= 300) countdownCircle.className.baseVal = "orange";
-    else countdownCircle.className.baseVal = "green";
-}
-
-function updateLapCircle() {
-    if (lastRaceMessage && lastRaceMessage.Drivers) {
-        const p1 = lastRaceMessage.Drivers.find(d => d.Position === 1);
-        if (p1 && p1.LapCount >= 0) {
-            const progress = driver.LapProgress; // 0–100 for current lap
-            lapCircle.style.strokeDashoffset = lapCircumference * (1 - lapProgress);
-        }
-    }
-}
-
-// fetch session every 15s
-async function fetchSession() {
-    const now = Date.now();
-    if (now - lastFetchTime < 15000) return; // throttle fetch
-    lastFetchTime = now;
-
-    try {
-        const res = await fetch('/session.json');
-        const data = await res.json();
-
-        if (!data.connected) {
-            statusEl.textContent = "DISCONNECTED";
-            countdownCircle.className.baseVal = "gray";
-            lapsEl.textContent = "-";
-            return;
+        // ------------------------
+        // Reset circle if new lap started
+        // ------------------------
+        if (lastLapCount !== lapCount) {
+            lapCircle.style.strokeDasharray = `0 100`;
+            lastLapCount = lapCount;
         }
 
-        if (data.remainingSeconds > 0) remainingSeconds = data.remainingSeconds;
-        statusEl.textContent = data.sessionStatus || "RUNNING";
+        // ------------------------
+        // Fill circle according to current lap progress
+        // ------------------------
+        const progress = Math.max(0, Math.min(100, driver.LapProgress || 0));
+        lapCircle.style.strokeDasharray = `${progress} 100`;
 
-        if (data.lastRaceMessage && data.lastRaceMessage.Drivers) {
-            lastRaceMessage = data.lastRaceMessage;
+        // ------------------------
+        // Change color when 2 minutes left
+        // ------------------------
+        if (remainingSeconds <= 120) {
+            lapCircle.style.stroke = 'green';
+        } else {
+            lapCircle.style.stroke = 'red';
         }
-
-        updateLaps();
-        updateLapCircle();
-    } catch {
-        statusEl.textContent = "ERROR";
-        countdownCircle.className.baseVal = "gray";
-        lapsEl.textContent = "-";
     }
-}
 
-function updateLaps() {
-    if (lastRaceMessage && lastRaceMessage.Drivers) {
-        const p1 = lastRaceMessage.Drivers.find(d => d.Position === 1);
-        if (p1) lapsEl.textContent = p1.LapCount >= 0 ? p1.LapCount : 0;
-    }
-}
-
-// local countdown tick (once per second)
-setInterval(() => {
-    if (remainingSeconds > 0) remainingSeconds--;
-
-    timeEl.textContent = formatTime(remainingSeconds);
-    updateCountdownCircle();
-    updateLaps();
-    updateLapCircle();
-
-    if (remainingSeconds === WARNING_AT && !warned) warned = true;
-}, 1000);
-
-// initial render
-updateCountdownCircle();
-updateLapCircle();
-timeEl.textContent = formatTime(remainingSeconds);
-lapsEl.textContent = "0";
-statusEl.textContent = "RUNNING";
-
-fetchSession();
-setInterval(fetchSession, 15000);
+    // ------------------------
+    // Fetch session JSON every second
+    // ------------------------
+    setInterval(async () => {
+        try {
+            const res = await fetch("/session.json");
+            const data = await res.json();
+            if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
+                const driver = data.lastRaceMessage.Drivers[0]; // P1 driver
+                driver.RemainingSeconds = data.remainingSeconds;
+                updateTimerAndLap(driver);
+            }
+        } catch (err) {
+            console.log("Error fetching session:", err);
+        }
+    }, 1000);
+});
 </script>
 
 </body>
