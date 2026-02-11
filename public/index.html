@@ -31,35 +31,31 @@
 
   circle {
     fill: none;
-    stroke-width: 12;
     stroke-linecap: round;
   }
 
-  /* Timer circle background */
+  /* Timer circle */
   #timer-bg {
     stroke: #333;
+    stroke-width: 12;
   }
 
-  /* Timer circle progress */
   #timer-progress {
     stroke: green;
+    stroke-width: 12;
     stroke-dasharray: 0 100;
     transition: stroke-dasharray 0.2s linear, stroke 0.5s;
   }
 
-  /* Lap circle */
-  #lap-circle {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-90deg);
-    width: 160px;
-    height: 160px;
+  /* Lap circle (thinner, inner) */
+  #lap-bg {
+    stroke: #333;
+    stroke-width: 6;
   }
 
-  #lap-circle circle {
+  #lap-progress {
+    stroke: #F72323;
     stroke-width: 6;
-    stroke: grey;
     stroke-dasharray: 0 100;
     transition: stroke-dasharray 0.2s linear;
   }
@@ -86,8 +82,8 @@
     <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
   </svg>
 
-  <!-- Lap circle inside -->
-  <svg id="lap-circle">
+  <!-- Inner lap circle -->
+  <svg style="position:absolute; top:50%; left:50%; width:160px; height:160px; transform: translate(-50%, -50%) rotate(-90deg);">
     <circle id="lap-bg" cx="80" cy="80" r="70"></circle>
     <circle id="lap-progress" cx="80" cy="80" r="70"></circle>
   </svg>
@@ -109,18 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!timerEl || !timerCircle || !lapCircle || !lapsEl) return;
 
-    // ------------------------
     // Timer countdown
-    // ------------------------
     const remainingSeconds = driver.RemainingSeconds || 0;
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
     timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
 
-    // ------------------------
-    // Timer circle color logic
-    // Green > 4 min, Amber 4–2 min, Red <=2 min
-    // ------------------------
+    // Timer circle color: green >4min, amber 4–2min, red <=2min
     if (remainingSeconds <= 120) {
       timerCircle.style.stroke = 'red';
     } else if (remainingSeconds <= 240) {
@@ -129,32 +120,27 @@ document.addEventListener("DOMContentLoaded", () => {
       timerCircle.style.stroke = 'green';
     }
 
-    // Fill timer circle based on remaining percentage
-    const totalSessionSeconds = 15 * 60; // 15 minutes session
+    // Timer circle progress (0–100)
+    const totalSessionSeconds = 15 * 60; // 15-minute session
     const progressPercent = Math.max(0, Math.min(100, (remainingSeconds / totalSessionSeconds) * 100));
     timerCircle.style.strokeDasharray = `${progressPercent} 100`;
 
-    // ------------------------
-    // Update laps completed
-    // ------------------------
+    // Update laps completed number
     const lapCount = Math.max(0, driver.LapCount || 0);
     lapsEl.textContent = lapCount;
 
-    // ------------------------
-    // Update lap circle (resets each lap)
-    // ------------------------
+    // Reset lap circle if new lap started
     if (lastLapCount !== lapCount) {
-      lapCircle.style.strokeDasharray = `0 100`; // reset
+      lapCircle.style.strokeDasharray = `0 100`; // reset inner circle
       lastLapCount = lapCount;
     }
 
+    // Fill lap circle based on current lap progress
     const lapProgress = Math.max(0, Math.min(100, driver.LapProgress || 0));
     lapCircle.style.strokeDasharray = `${lapProgress} 100`;
   }
 
-  // ------------------------
-  // Fetch session JSON every second
-  // ------------------------
+  // Fetch session.json every second
   setInterval(async () => {
     try {
       const res = await fetch("/session.json");
