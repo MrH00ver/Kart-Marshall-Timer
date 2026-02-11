@@ -86,7 +86,7 @@
     <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
   </svg>
 
-  <!-- Inner lap circle: smaller radius and closer to timer -->
+  <!-- Inner lap circle -->
   <svg style="position:absolute; top:50%; left:50%; width:180px; height:180px; transform: translate(-50%, -50%) rotate(-90deg);">
     <circle id="lap-bg" cx="90" cy="90" r="80"></circle>
     <circle id="lap-progress" cx="90" cy="90" r="80"></circle>
@@ -121,8 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/session.json");
       const data = await res.json();
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
-        localRemainingSeconds = data.remainingSeconds;
-        updateDriver(data.lastRaceMessage.Drivers[0]);
+        const p1Driver = data.lastRaceMessage.Drivers.find(d => d.Position === 1);
+        if (p1Driver) {
+          localRemainingSeconds = data.remainingSeconds;
+          updateDriver(p1Driver);
+        }
       }
       lastFetchTime = Date.now();
     } catch (err) {
@@ -131,18 +134,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateDriver(driver) {
+    // Update laps completed number
     const lapCount = Math.max(0, driver.LapCount || 0);
     lapsEl.textContent = lapCount;
 
-    // Reset lap progress circle if new lap
+    // Reset lap circle if new lap
     if (lastLapCount !== lapCount) {
       lapCircle.style.strokeDasharray = `0 ${lapCirc}`; // reset
       lastLapCount = lapCount;
     }
 
-    // Update lap progress (0 → 1 per lap)
-    const lapProgress = Math.max(0, Math.min(1, driver.LapProgress || 0));
-    lapCircle.style.strokeDasharray = `${lapCirc * lapProgress} ${lapCirc}`;
+    // Update lap circle progress (normalized 0-1)
+    const lapProgressNormalized = Math.max(0, Math.min(1, (driver.LapProgress || 0) / 100));
+    lapCircle.style.strokeDasharray = `${lapCirc * lapProgressNormalized} ${lapCirc}`;
   }
 
   function updateTimerVisual() {
@@ -150,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
+    // Timer color
     if (localRemainingSeconds <= 120) {
       timerCircle.style.stroke = 'red';
     } else if (localRemainingSeconds <= 240) {
@@ -158,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       timerCircle.style.stroke = 'green';
     }
 
+    // Timer text
     const minutes = Math.floor(localRemainingSeconds / 60);
     const seconds = localRemainingSeconds % 60;
     timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
