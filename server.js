@@ -1,78 +1,63 @@
 /*
 ====================================================
-KART TIMER SERVER
+KART TIMER SERVER (PRODUCTION READY)
 ----------------------------------------------------
 What this server does:
 1. Connects to SMS Timing WebSocket
 2. Listens for live race data
 3. Stores latest race message
-4. Calculates remaining session time
+4. Calculates remaining session time using ClockMs
 5. Exposes data at /session.json
 6. Serves your public HTML page
 ====================================================
 */
 
-// Import required packages
+// ---------------------------
+// IMPORT REQUIRED PACKAGES
+// ---------------------------
 const express = require("express");      // Web server framework
 const WebSocket = require("ws");         // WebSocket client for SMS Timing
 const path = require("path");            // Helps with file paths
 
-// Create Express app
+// ---------------------------
+// CREATE EXPRESS APP
+// ---------------------------
 const app = express();
 
-/*
-====================================================
-CONFIGURATION
-====================================================
-*/
-
-// IMPORTANT: Cloud hosting requires this format
-// If process.env.PORT exists (cloud), use it.
-// Otherwise default to 3000 for local use.
+// ---------------------------
+// CONFIGURATION
+// ---------------------------
+// Cloud hosting requires using process.env.PORT
 const PORT = process.env.PORT || 3000;
 
-// SMS Timing WebSocket server details
+// SMS Timing WebSocket server
 const SMS_HOST = "wss://webserver4.sms-timing.com:10015";
 
-/*
-====================================================
-STATE VARIABLES
-====================================================
-*/
+// ---------------------------
+// STATE VARIABLES
+// ---------------------------
+let connected = false;          // Tracks WebSocket connection
+let lastRaceMessage = null;     // Stores last full race message
+let remainingSeconds = 0;       // Tracks remaining session time
+let sessionStatus = "UNKNOWN";  // Tracks race session status
 
-// Track whether WebSocket is connected
-let connected = false;
-
-// Store latest full race message (BcRace)
-let lastRaceMessage = null;
-
-// Track remaining seconds in session
-let remainingSeconds = 0;
-
-// Track session status
-let sessionStatus = "UNKNOWN";
-
-/*
-====================================================
-CONNECT TO SMS TIMING WEBSOCKET
-====================================================
-*/
-
+// ---------------------------
+// FUNCTION: CONNECT TO SMS TIMING
+// ---------------------------
 function connectToSms() {
-
     console.log("Connecting to SMS Timing...");
 
     // Create WebSocket connection
     const ws = new WebSocket(SMS_HOST);
 
-    // When connection opens
+    // ---------------------------
+    // ON OPEN
+    // ---------------------------
     ws.on("open", () => {
-
         console.log("Connected to SMS Timing");
-
         connected = true;
 
-        // Send subscription message to request race data
+        // Subscribe to race data
         ws.send(JSON.stringify({
             "$type": "BcStart",
             "ClientKey": "teamsportmanchestertraffordpark",
@@ -83,36 +68,27 @@ function connectToSms() {
         }));
     });
 
-    /*
-    ============================================
-    WHEN WE RECEIVE DATA FROM SMS
-    ============================================
-    */
+    // ---------------------------
+    // ON MESSAGE
+    // ---------------------------
     ws.on("message", (message) => {
-
         try {
             const data = JSON.parse(message);
 
-            // We only care about race updates
+            // Only process race updates
             if (data.$type === "BcRace") {
-
                 lastRaceMessage = data;
-
-                // Update session status
                 sessionStatus = data.RaceState || "UNKNOWN";
 
-                // Calculate remaining time
-                // ScheduledEnd is an ISO date string
-                const now = new Date();
-                const endTime = new Date(data.ScheduledEnd);
-
-                const diffMs = endTime - now;
-
-                // Convert milliseconds to seconds
-                remainingSeconds = Math.max(
-                    0,
-                    Math.floor(diffMs / 1000)
-                );
+                // Use ClockMs from SMS Timing if available (more accurate than calculating from ScheduledEnd)
+                if (data.ClockMs != null) {
+                    remainingSeconds = Math.floor(data.ClockMs / 1000);
+                } else {
+                    // Fallback to calculating from ScheduledEnd if ClockMs missing
+                    const now = new Date();
+                    const endTime = new Date(data.ScheduledEnd);
+                    remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+                }
             }
 
         } catch (err) {
@@ -120,37 +96,34 @@ function connectToSms() {
         }
     });
 
-    /*
-    ============================================
-    HANDLE DISCONNECTS
-    ============================================
-    */
+    // ---------------------------
+    // ON CLOSE
+    // ---------------------------
     ws.on("close", () => {
         console.log("Disconnected from SMS. Reconnecting in 5s...");
         connected = false;
 
-        // Try reconnect after 5 seconds
+        // Reconnect after 5 seconds
         setTimeout(connectToSms, 5000);
     });
 
+    // ---------------------------
+    // ON ERROR
+    // ---------------------------
     ws.on("error", (err) => {
         console.log("WebSocket error:", err.message);
         ws.close();
     });
 }
 
-// Start connection
+// Start WebSocket connection
 connectToSms();
 
-/*
-====================================================
-API ENDPOINT
-====================================================
-*/
-
-// This is what your HTML page fetches
+// ---------------------------
+// API ENDPOINT
+// ---------------------------
+// Your webpage fetches this
 app.get("/session.json", (req, res) => {
-
     res.json({
         connected,
         remainingSeconds,
@@ -159,24 +132,18 @@ app.get("/session.json", (req, res) => {
     });
 });
 
-/*
-====================================================
-SERVE STATIC WEBSITE
-====================================================
-*/
-
-// Serves files inside the "public" folder
+// ---------------------------
+// SERVE STATIC FILES
+// ---------------------------
+// Serves files inside "public" folder
 app.use(express.static(path.join(__dirname, "public")));
 
-/*
-====================================================
-START SERVER
-====================================================
-*/
-
+// ---------------------------
+// START SERVER
+// ---------------------------
 app.listen(PORT, () => {
-    console.log(`==================================`);
+    console.log("==================================");
     console.log(`Kart Timer Server Running`);
     console.log(`Local: http://localhost:${PORT}`);
-    console.log(`==================================`);
+    console.log("==================================");
 });
