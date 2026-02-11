@@ -99,7 +99,9 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   let lastLapCount = null;
-  let lastTextUpdate = 0;
+  let localRemainingSeconds = 15 * 60; // fallback start time
+  const fetchInterval = 15000; // fetch from server every 15s
+  let lastFetchTime = 0;
 
   const timerCircle = document.getElementById("timer-progress");
   const lapCircle = document.getElementById("lap-progress");
@@ -114,39 +116,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const timerEl = document.getElementById("timer");
   const lapsEl = document.getElementById("laps-completed");
 
-  function updateDisplay(driver) {
-    const remainingSeconds = driver.RemainingSeconds || 0;
-    const totalSessionSeconds = 15 * 60;
-
-    // ------------------------
-    // Update timer circle EVERY SECOND
-    // ------------------------
-    const timerProgress = Math.max(0, Math.min(1, remainingSeconds / totalSessionSeconds));
-    timerCircle.style.strokeDasharray = `${timerCirc * timerProgress} ${timerCirc}`;
-
-    // Timer color based on remaining time
-    if (remainingSeconds <= 120) {
-      timerCircle.style.stroke = 'red';
-    } else if (remainingSeconds <= 240) {
-      timerCircle.style.stroke = 'orange';
-    } else {
-      timerCircle.style.stroke = 'green';
+  async function fetchTime() {
+    try {
+      const res = await fetch("/session.json");
+      const data = await res.json();
+      if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
+        // overwrite local time with server value
+        localRemainingSeconds = data.remainingSeconds;
+        updateDriver(data.lastRaceMessage.Drivers[0]);
+      }
+      lastFetchTime = Date.now();
+    } catch (err) {
+      console.log("Error fetching session:", err);
     }
+  }
 
-    // ------------------------
-    // Update timer text ONLY every 10s
-    // ------------------------
-    const now = Date.now();
-    if (now - lastTextUpdate >= 10000 || lastTextUpdate === 0) {
-      lastTextUpdate = now;
-      const minutes = Math.floor(remainingSeconds / 60);
-      const seconds = remainingSeconds % 60;
-      timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
-    }
-
-    // ------------------------
-    // Update lap circle
-    // ------------------------
+  function updateDriver(driver) {
     const lapCount = Math.max(0, driver.LapCount || 0);
     lapsEl.textContent = lapCount;
 
@@ -159,20 +144,40 @@ document.addEventListener("DOMContentLoaded", () => {
     lapCircle.style.strokeDasharray = `${lapCirc * lapProgress} ${lapCirc}`;
   }
 
+  function updateTimerVisual() {
+    // Timer circle
+    const totalSessionSeconds = 15 * 60;
+    const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
+    timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
+
+    // Timer color
+    if (localRemainingSeconds <= 120) {
+      timerCircle.style.stroke = 'red';
+    } else if (localRemainingSeconds <= 240) {
+      timerCircle.style.stroke = 'orange';
+    } else {
+      timerCircle.style.stroke = 'green';
+    }
+
+    // Timer text
+    const minutes = Math.floor(localRemainingSeconds / 60);
+    const seconds = localRemainingSeconds % 60;
+    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2,'0')}`;
+  }
+
   // ------------------------
-  // Fetch session.json every second
+  // Main loop: runs every second
   // ------------------------
   setInterval(async () => {
-    try {
-      const res = await fetch("/session.json");
-      const data = await res.json();
-      if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
-        const driver = data.lastRaceMessage.Drivers[0];
-        driver.RemainingSeconds = data.remainingSeconds;
-        updateDisplay(driver);
-      }
-    } catch (err) {
-      console.log("Error fetching session:", err);
+    // decrement locally
+    localRemainingSeconds = Math.max(0, localRemainingSeconds - 1);
+
+    // update visuals
+    updateTimerVisual();
+
+    // fetch new value from server every 15s
+    if (Date.now() - lastFetchTime >= fetchInterval) {
+      await fetchTime();
     }
   }, 1000);
 });
