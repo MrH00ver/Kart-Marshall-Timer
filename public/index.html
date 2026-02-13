@@ -81,9 +81,6 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   let localRemainingSeconds = 15 * 60; // fallback
-  const fetchInterval = 15000; // fetch server every 15s
-  let lastFetchTime = 0;
-
   let lapProgressCurrent = 0;
   let lapProgressTarget = 0;
   let lastLapCount = null;
@@ -126,11 +123,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         lastLapCount = lapCount;
 
-        // Set target for lap circle (0-1)
+        // Lap progress 0 → 1
         lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0)/100));
       }
-
-      lastFetchTime = Date.now();
     } catch (err) {
       console.log("Error fetching session:", err);
     }
@@ -141,7 +136,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
-    // Timer color alerts
     if (localRemainingSeconds <= 120) timerCircle.style.stroke = 'red';
     else if (localRemainingSeconds <= 240) timerCircle.style.stroke = 'orange';
     else timerCircle.style.stroke = 'green';
@@ -152,25 +146,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateLapVisual() {
-    // Smooth interpolation
     const diff = lapProgressTarget - lapProgressCurrent;
-    lapProgressCurrent += diff * 0.5; // faster interpolation
+    lapProgressCurrent += diff * 0.5;
     if (Math.abs(lapProgressTarget - lapProgressCurrent) < 0.01) {
-      lapProgressCurrent = lapProgressTarget; // clamp to target
+      lapProgressCurrent = lapProgressTarget;
     }
     lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
   }
 
   setInterval(async () => {
+    // fetch server every second
+    await fetchTime();
+
     // countdown timer locally
     localRemainingSeconds = Math.max(0, localRemainingSeconds - 1);
+
     updateTimerVisual();
     updateLapVisual();
-
-    // fetch server every 15s
-    if (Date.now() - lastFetchTime >= fetchInterval) {
-      await fetchTime();
-    }
   }, 1000);
 
   fetchTime();
