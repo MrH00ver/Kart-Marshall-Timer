@@ -33,7 +33,7 @@
     stroke-linecap: round;
   }
 
-  /* ===== MAIN TIMER RING (THICKER) ===== */
+  /* ===== RINGS (slightly inset Apple-style) ===== */
   #timer-bg {
     stroke: #2c2c2e;
     stroke-width: 20;
@@ -42,12 +42,10 @@
   #timer-progress {
     stroke: #32d74b;
     stroke-width: 20;
-    stroke-dasharray: 0 0;
     transition: stroke 0.3s linear;
     filter: drop-shadow(0 0 8px rgba(50,215,75,0.25));
   }
 
-  /* ===== LAP RING (slightly thicker) ===== */
   #lap-bg {
     stroke: #2c2c2e;
     stroke-width: 7;
@@ -56,39 +54,44 @@
   #lap-progress {
     stroke: #4cc9ff;
     stroke-width: 7;
-    stroke-dasharray: 0 0;
     filter: drop-shadow(0 0 5px rgba(76,201,255,0.25));
   }
 
-  /* ===== TIMER TEXT (BIGGER) ===== */
+  /* ===== TIMER ===== */
   #timer {
     position: absolute;
-    top: 44%;
+    top: 150px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     font-size: 4.2em;
     font-weight: 800;
     color: white;
-    letter-spacing: 1px;
-    text-shadow: 0 0 8px rgba(255,255,255,0.3);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 
-  /* ===== LAP COUNT (BIGGER + CLOSER) ===== */
+  /* ===== LAP COUNT ===== */
   #laps-completed {
     position: absolute;
-    top: 63%;
+    top: 205px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 2.6em;
     font-weight: 600;
     color: white;
-    opacity: 0.9;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 
-  @keyframes lapPulse {
-    0% { stroke-width: 7; opacity: 1; }
-    50% { stroke-width: 11; opacity: 0.8; }
-    100% { stroke-width: 7; opacity: 1; }
+  #laps-label {
+    position: absolute;
+    top: 245px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.9em;
+    letter-spacing: 2px;
+    opacity: 0.6;
+    color: white;
   }
 
 </style>
@@ -98,27 +101,31 @@
 
 <div id="timer-container">
 
+  <!-- Main timer ring (slightly inset) -->
   <svg>
-    <circle id="timer-bg" cx="165" cy="165" r="150"></circle>
-    <circle id="timer-progress" cx="165" cy="165" r="150"></circle>
+    <circle id="timer-bg" cx="165" cy="165" r="140"></circle>
+    <circle id="timer-progress" cx="165" cy="165" r="140"></circle>
   </svg>
 
-  <svg style="position:absolute; top:50%; left:50%; width:285px; height:285px; transform: translate(-50%, -50%) rotate(-90deg);">
-    <circle id="lap-bg" cx="142.5" cy="142.5" r="130"></circle>
-    <circle id="lap-progress" cx="142.5" cy="142.5" r="130"></circle>
+  <!-- Lap ring -->
+  <svg style="position:absolute; top:50%; left:50%; width:280px; height:280px; transform: translate(-50%, -50%) rotate(-90deg);">
+    <circle id="lap-bg" cx="140" cy="140" r="120"></circle>
+    <circle id="lap-progress" cx="140" cy="140" r="120"></circle>
   </svg>
 
   <div id="timer">Loading</div>
   <div id="laps-completed">0</div>
+  <div id="laps-label">LAPS</div>
 
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-  let localRemainingSeconds = 15 * 60;
   const fetchInterval = 5000;
-  let lastFetchTime = 0;
+
+  let serverRemainingSeconds = 0;
+  let serverSyncTime = 0;
 
   let lapProgressCurrent = 0;
   let lapProgressTarget = 0;
@@ -144,51 +151,59 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
 
       if (data.lastRaceMessage?.Drivers?.length > 0) {
+
+        serverRemainingSeconds = data.remainingSeconds;
+        serverSyncTime = Date.now();
+
         const p1Driver = data.lastRaceMessage.Drivers.find(d => Number(d.Position) === 1);
         if (!p1Driver) return;
-
-        localRemainingSeconds = data.remainingSeconds;
 
         const lapCount = Math.max(0, p1Driver.LapCount || 0);
         lapsEl.textContent = lapCount;
 
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
-          lapCircle.style.animation = 'lapPulse 0.5s ease';
-          setTimeout(() => lapCircle.style.animation = '', 500);
         }
 
         lastLapCount = lapCount;
 
-        lapProgressTarget = Math.max(
-          0,
-          Math.min(1, (p1Driver.LapProgress || 0) / 100)
-        );
+        lapProgressTarget =
+          Math.max(0, Math.min(1, (p1Driver.LapProgress || 0) / 100));
       }
 
-      lastFetchTime = Date.now();
     } catch (err) {
       console.log("Fetch error:", err);
     }
   }
 
-  function updateTimerVisual() {
+  function getAccurateRemainingTime() {
+    const elapsedSinceSync =
+      Math.floor((Date.now() - serverSyncTime) / 1000);
+
+    return Math.max(0,
+      serverRemainingSeconds - elapsedSinceSync
+    );
+  }
+
+  function updateTimerVisual(remaining) {
+
     const totalSessionSeconds = 15 * 60;
-    const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
+    const progress =
+      Math.max(0, Math.min(1, remaining / totalSessionSeconds));
 
     timerCircle.style.strokeDasharray =
       `${timerCirc * progress} ${timerCirc}`;
 
-    if (localRemainingSeconds <= 120) {
+    if (remaining <= 120) {
       timerCircle.style.stroke = '#ff3b30';
-    } else if (localRemainingSeconds <= 240) {
+    } else if (remaining <= 240) {
       timerCircle.style.stroke = '#ff9f0a';
     } else {
       timerCircle.style.stroke = '#32d74b';
     }
 
-    const minutes = Math.floor(localRemainingSeconds / 60);
-    const seconds = localRemainingSeconds % 60;
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
 
     timerEl.textContent =
       `${minutes}:${seconds.toString().padStart(2,'0')}`;
@@ -209,19 +224,16 @@ document.addEventListener("DOMContentLoaded", () => {
       `${lapCirc * lapProgressCurrent} ${lapCirc}`;
   }
 
-  setInterval(async () => {
+  setInterval(() => {
 
-    if (Date.now() - lastFetchTime >= fetchInterval) {
-      await fetchTime();
-    }
+    const remaining = getAccurateRemainingTime();
 
-    localRemainingSeconds =
-      Math.max(0, localRemainingSeconds - 1);
-
-    updateTimerVisual();
+    updateTimerVisual(remaining);
     updateLapVisual();
 
   }, 1000);
+
+  setInterval(fetchTime, fetchInterval);
 
   fetchTime();
 
