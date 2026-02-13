@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kart Timer - Apple Watch Style</title>
+<title>Kart Timer</title>
+
 <style>
   body {
     margin: 0;
@@ -11,7 +12,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    background: #121212;
+
+    /* Subtle Apple-style radial background */
+    background: radial-gradient(circle at center, #1c1c1e 0%, #0f0f10 70%);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif;
   }
 
@@ -32,63 +35,76 @@
     stroke-linecap: round;
   }
 
-  /* Timer background & progress */
-  #timer-bg { stroke: #333; stroke-width: 14; }
-  #timer-progress { 
-    stroke: green; 
-    stroke-width: 14; 
-    stroke-dasharray: 0 0; 
-    transition: stroke-dasharray 0.3s linear, stroke 0.3s linear;
-    filter: drop-shadow(0 0 4px rgba(0,0,0,0.5));
+  /* Main timer ring */
+  #timer-bg {
+    stroke: #2c2c2e;
+    stroke-width: 14;
   }
 
-  /* Lap circle */
-  #lap-bg { stroke: #333; stroke-width: 5; }
-  #lap-progress { 
-    stroke: #00BFFF; 
-    stroke-width: 5; 
+  #timer-progress {
+    stroke: limegreen;
+    stroke-width: 14;
     stroke-dasharray: 0 0;
-    filter: drop-shadow(0 0 3px rgba(0,191,255,0.5));
+    transition: stroke-dasharray 0.3s linear, stroke 0.3s linear;
+    filter: drop-shadow(0 0 6px rgba(0,255,0,0.15));
   }
 
+  /* Lap ring */
+  #lap-bg {
+    stroke: #2c2c2e;
+    stroke-width: 5;
+  }
+
+  #lap-progress {
+    stroke: #4cc9ff;
+    stroke-width: 5;
+    stroke-dasharray: 0 0;
+    filter: drop-shadow(0 0 4px rgba(76,201,255,0.25));
+  }
+
+  /* Timer text */
   #timer {
     position: absolute;
-    top: 40%;
+    top: 42%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 3em;
+    font-size: 3.2em;
     font-weight: 700;
-    text-align: center;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+    color: white;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px rgba(255,255,255,0.25);
   }
 
+  /* Lap count BELOW timer */
   #laps-completed {
     position: absolute;
-    top: 70%;
+    top: 60%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 2em;
+    font-size: 2.2em;
     font-weight: 600;
-    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+    color: white;
+    opacity: 0.9;
   }
 
-  /* Subtle lap pulse */
   @keyframes lapPulse {
     0% { stroke-width: 5; opacity: 1; }
-    50% { stroke-width: 8; opacity: 0.7; }
+    50% { stroke-width: 8; opacity: 0.8; }
     100% { stroke-width: 5; opacity: 1; }
   }
+
 </style>
 </head>
+
 <body>
 
 <div id="timer-container">
+
   <svg>
     <circle id="timer-bg" cx="150" cy="150" r="140"></circle>
     <circle id="timer-progress" cx="150" cy="150" r="140"></circle>
   </svg>
 
-  <!-- Lap progress circle -->
   <svg style="position:absolute; top:50%; left:50%; width:260px; height:260px; transform: translate(-50%, -50%) rotate(-90deg);">
     <circle id="lap-bg" cx="130" cy="130" r="120"></circle>
     <circle id="lap-progress" cx="130" cy="130" r="120"></circle>
@@ -96,10 +112,12 @@
 
   <div id="timer">Loading</div>
   <div id="laps-completed">0</div>
+
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+
   let localRemainingSeconds = 15 * 60;
   const fetchInterval = 5000;
   let lastFetchTime = 0;
@@ -127,31 +145,28 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/session.json");
       const data = await res.json();
 
-      if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
-        const drivers = data.lastRaceMessage.Drivers;
-        const p1Driver = drivers.find(d => Number(d.Position) === 1);
+      if (data.lastRaceMessage?.Drivers?.length > 0) {
+        const p1Driver = data.lastRaceMessage.Drivers.find(d => Number(d.Position) === 1);
         if (!p1Driver) return;
 
         localRemainingSeconds = data.remainingSeconds;
 
-        // Update lap count
         const lapCount = Math.max(0, p1Driver.LapCount || 0);
         lapsEl.textContent = lapCount;
 
-        // Reset lap progress if new lap
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
           lapCircle.style.animation = 'lapPulse 0.5s ease';
           setTimeout(() => lapCircle.style.animation = '', 500);
         }
-        lastLapCount = lapCount;
 
+        lastLapCount = lapCount;
         lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0)/100));
       }
 
       lastFetchTime = Date.now();
     } catch (err) {
-      console.log("Error fetching session:", err);
+      console.log("Fetch error:", err);
     }
   }
 
@@ -160,10 +175,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
-    // Gradient-like effect: green → orange → red
-    if (localRemainingSeconds <= 120) timerCircle.style.stroke = 'red';
-    else if (localRemainingSeconds <= 240) timerCircle.style.stroke = 'orange';
-    else timerCircle.style.stroke = 'limegreen';
+    if (localRemainingSeconds <= 120) {
+      timerCircle.style.stroke = '#ff3b30'; // Apple red
+    } else if (localRemainingSeconds <= 240) {
+      timerCircle.style.stroke = '#ff9f0a'; // Apple orange
+    } else {
+      timerCircle.style.stroke = '#32d74b'; // Apple green
+    }
 
     const minutes = Math.floor(localRemainingSeconds / 60);
     const seconds = localRemainingSeconds % 60;
@@ -173,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateLapVisual() {
     const diff = lapProgressTarget - lapProgressCurrent;
     if (Math.abs(diff) > 0.01) {
-      lapProgressCurrent += diff * 0.5;
+      lapProgressCurrent += diff * 0.4;
       if (Math.abs(lapProgressTarget - lapProgressCurrent) < 0.01) {
         lapProgressCurrent = lapProgressTarget;
       }
@@ -182,6 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   setInterval(async () => {
+
     if (Date.now() - lastFetchTime >= fetchInterval) {
       await fetchTime();
     }
@@ -190,9 +209,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateTimerVisual();
     updateLapVisual();
+
   }, 1000);
 
   fetchTime();
+
 });
 </script>
 
