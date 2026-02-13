@@ -7,20 +7,19 @@
 <style>
   body {
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100vh;
     margin: 0;
-    font-family: Arial, sans-serif;
     background: #111;
     color: white;
+    font-family: Arial, sans-serif;
   }
 
   #timer-container {
     position: relative;
-    width: 220px;
-    height: 220px;
+    width: 300px;  /* bigger for 42mm screen */
+    height: 300px;
   }
 
   svg {
@@ -35,28 +34,28 @@
   }
 
   /* Timer circle */
-  #timer-bg { stroke: #333; stroke-width: 12; }
-  #timer-progress { stroke: green; stroke-width: 12; stroke-dasharray: 0 0; transition: stroke 0.3s linear, stroke-dasharray 0.3s linear; }
+  #timer-bg { stroke: #333; stroke-width: 14; }
+  #timer-progress { stroke: green; stroke-width: 14; stroke-dasharray: 0 0; transition: stroke 0.3s linear, stroke-dasharray 0.3s linear; }
 
-  /* Lap progress circle */
-  #lap-bg { stroke: #333; stroke-width: 4; }
-  #lap-progress { stroke: #00FF00; stroke-width: 4; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
+  /* Lap progress circle inside */
+  #lap-bg { stroke: #333; stroke-width: 5; }
+  #lap-progress { stroke: #00FF00; stroke-width: 5; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
 
   #timer {
     position: absolute;
     top: 40%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 2em;
+    font-size: 3em;  /* bigger for watch */
     text-align: center;
   }
 
   #laps-completed {
     position: absolute;
-    top: 65%;
+    top: 70%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 1.5em;
+    font-size: 2em;
   }
 </style>
 </head>
@@ -64,14 +63,14 @@
 
 <div id="timer-container">
   <svg>
-    <circle id="timer-bg" cx="110" cy="110" r="100"></circle>
-    <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
+    <circle id="timer-bg" cx="150" cy="150" r="140"></circle>
+    <circle id="timer-progress" cx="150" cy="150" r="140"></circle>
   </svg>
 
-  <!-- Lap progress circle closer and thinner -->
-  <svg style="position:absolute; top:50%; left:50%; width:200px; height:200px; transform: translate(-50%, -50%) rotate(-90deg);">
-    <circle id="lap-bg" cx="100" cy="100" r="90"></circle>
-    <circle id="lap-progress" cx="100" cy="100" r="90"></circle>
+  <!-- Lap progress circle -->
+  <svg style="position:absolute; top:50%; left:50%; width:260px; height:260px; transform: translate(-50%, -50%) rotate(-90deg);">
+    <circle id="lap-bg" cx="130" cy="130" r="120"></circle>
+    <circle id="lap-progress" cx="130" cy="130" r="120"></circle>
   </svg>
 
   <div id="timer">Loading</div>
@@ -81,6 +80,9 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   let localRemainingSeconds = 15 * 60; // fallback
+  const fetchInterval = 5000; // fetch every 5s
+  let lastFetchTime = 0;
+
   let lapProgressCurrent = 0;
   let lapProgressTarget = 0;
   let lastLapCount = null;
@@ -107,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
         const drivers = data.lastRaceMessage.Drivers;
 
-        // Pick P1 safely (Position may be string)
+        // Pick P1 safely
         const p1Driver = drivers.find(d => Number(d.Position) === 1);
         if (!p1Driver) return;
 
@@ -117,15 +119,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const lapCount = Math.max(0, p1Driver.LapCount || 0);
         lapsEl.textContent = lapCount;
 
-        // Reset lap progress only if lapCount increased
+        // Reset lap progress only if new lap
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
         }
         lastLapCount = lapCount;
 
-        // Lap progress 0 → 1
         lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0)/100));
       }
+
+      lastFetchTime = Date.now();
     } catch (err) {
       console.log("Error fetching session:", err);
     }
@@ -155,8 +158,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   setInterval(async () => {
-    // fetch server every second
-    await fetchTime();
+    // Fetch server every 5 seconds
+    if (Date.now() - lastFetchTime >= fetchInterval) {
+      await fetchTime();
+    }
 
     // countdown timer locally
     localRemainingSeconds = Math.max(0, localRemainingSeconds - 1);
