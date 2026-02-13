@@ -18,7 +18,7 @@
 
   #timer-container {
     position: relative;
-    width: 300px;  /* bigger for 42mm screen */
+    width: 300px;
     height: 300px;
   }
 
@@ -37,17 +37,19 @@
   #timer-bg { stroke: #333; stroke-width: 14; }
   #timer-progress { stroke: green; stroke-width: 14; stroke-dasharray: 0 0; transition: stroke 0.3s linear, stroke-dasharray 0.3s linear; }
 
-  /* Lap progress circle inside */
+  /* Lap progress circle */
   #lap-bg { stroke: #333; stroke-width: 5; }
-  #lap-progress { stroke: #00FF00; stroke-width: 5; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
+  #lap-progress { stroke: #00BFFF; stroke-width: 5; stroke-dasharray: 0 0; } /* light blue */
 
   #timer {
     position: absolute;
     top: 40%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 3em;  /* bigger for watch */
+    font-size: 3em;
+    font-weight: 900; /* bolder for visibility */
     text-align: center;
+    text-shadow: 1px 1px 2px black;
   }
 
   #laps-completed {
@@ -56,6 +58,8 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 2em;
+    font-weight: 700; /* bolder */
+    text-shadow: 1px 1px 2px black;
   }
 </style>
 </head>
@@ -109,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
         const drivers = data.lastRaceMessage.Drivers;
 
-        // Pick P1 safely
+        // Pick P1
         const p1Driver = drivers.find(d => Number(d.Position) === 1);
         if (!p1Driver) return;
 
@@ -119,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const lapCount = Math.max(0, p1Driver.LapCount || 0);
         lapsEl.textContent = lapCount;
 
-        // Reset lap progress only if new lap
+        // Reset lap progress if new lap
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
         }
@@ -149,12 +153,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateLapVisual() {
+    // Only update if difference > small threshold for efficiency
     const diff = lapProgressTarget - lapProgressCurrent;
-    lapProgressCurrent += diff * 0.5;
-    if (Math.abs(lapProgressTarget - lapProgressCurrent) < 0.01) {
-      lapProgressCurrent = lapProgressTarget;
+    if (Math.abs(diff) > 0.01) {
+      lapProgressCurrent += diff * 0.5;
+      if (Math.abs(lapProgressTarget - lapProgressCurrent) < 0.01) {
+        lapProgressCurrent = lapProgressTarget;
+      }
+      lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
     }
-    lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
   }
 
   setInterval(async () => {
