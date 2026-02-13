@@ -23,9 +23,12 @@
   }
 
   svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 330px;
+    height: 330px;
     transform: rotate(-90deg);
-    width: 100%;
-    height: 100%;
   }
 
   circle {
@@ -33,7 +36,7 @@
     stroke-linecap: round;
   }
 
-  /* ===== RINGS (Inset Apple-style) ===== */
+  /* ===== MAIN TIMER RING ===== */
   #timer-bg {
     stroke: #2c2c2e;
     stroke-width: 20;
@@ -46,6 +49,7 @@
     filter: drop-shadow(0 0 8px rgba(50,215,75,0.25));
   }
 
+  /* ===== LAP RING (perfectly centred now) ===== */
   #lap-bg {
     stroke: #2c2c2e;
     stroke-width: 7;
@@ -57,12 +61,12 @@
     filter: drop-shadow(0 0 5px rgba(76,201,255,0.25));
   }
 
-  /* ===== TIMER TEXT (moved up slightly) ===== */
+  /* ===== TIMER TEXT (stays centred on circle) ===== */
   #timer {
     position: absolute;
-    top: 135px;
+    top: 140px; /* slightly higher but still centred */
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     font-size: 4.2em;
     font-weight: 800;
     color: white;
@@ -70,10 +74,10 @@
     line-height: 1;
   }
 
-  /* ===== LAP COUNT (moved down slightly) ===== */
+  /* ===== LAP COUNT ===== */
   #laps-completed {
     position: absolute;
-    top: 215px;
+    top: 195px; /* moved upward */
     left: 50%;
     transform: translateX(-50%);
     font-size: 2.6em;
@@ -86,7 +90,7 @@
   /* ===== LAPS LABEL ===== */
   #laps-label {
     position: absolute;
-    top: 255px;
+    top: 230px; /* moved upward */
     left: 50%;
     transform: translateX(-50%);
     font-size: 0.9em;
@@ -102,16 +106,16 @@
 
 <div id="timer-container">
 
-  <!-- Main timer ring -->
+  <!-- MAIN RING -->
   <svg>
     <circle id="timer-bg" cx="165" cy="165" r="140"></circle>
     <circle id="timer-progress" cx="165" cy="165" r="140"></circle>
   </svg>
 
-  <!-- Lap ring (inset slightly like Apple Activity) -->
-  <svg style="position:absolute; top:50%; left:50%; width:280px; height:280px; transform: translate(-50%, -50%) rotate(-90deg);">
-    <circle id="lap-bg" cx="140" cy="140" r="120"></circle>
-    <circle id="lap-progress" cx="140" cy="140" r="120"></circle>
+  <!-- LAP RING (same centre 165 / 165) -->
+  <svg>
+    <circle id="lap-bg" cx="165" cy="165" r="120"></circle>
+    <circle id="lap-progress" cx="165" cy="165" r="120"></circle>
   </svg>
 
   <div id="timer">Loading</div>
@@ -178,11 +182,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getAccurateRemainingTime() {
-    const elapsedSinceSync =
+    const elapsed =
       Math.floor((Date.now() - serverSyncTime) / 1000);
 
     return Math.max(0,
-      serverRemainingSeconds - elapsedSinceSync
+      serverRemainingSeconds - elapsed
     );
   }
 
