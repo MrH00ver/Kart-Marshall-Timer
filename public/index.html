@@ -36,11 +36,11 @@
 
   /* Timer circle */
   #timer-bg { stroke: #333; stroke-width: 12; }
-  #timer-progress { stroke: green; stroke-width: 12; stroke-dasharray: 0 0; transition: stroke 0.5s linear, stroke-dasharray 0.2s linear; }
+  #timer-progress { stroke: green; stroke-width: 12; stroke-dasharray: 0 0; transition: stroke 0.3s linear, stroke-dasharray 0.3s linear; }
 
   /* Lap progress circle */
-  #lap-bg { stroke: #333; stroke-width: 6; }
-  #lap-progress { stroke: #00FF00; stroke-width: 6; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
+  #lap-bg { stroke: #333; stroke-width: 4; }
+  #lap-progress { stroke: #00FF00; stroke-width: 4; stroke-dasharray: 0 0; transition: stroke-dasharray 0.2s linear; }
 
   #timer {
     position: absolute;
@@ -68,10 +68,10 @@
     <circle id="timer-progress" cx="110" cy="110" r="100"></circle>
   </svg>
 
-  <!-- Inner lap circle -->
-  <svg style="position:absolute; top:50%; left:50%; width:180px; height:180px; transform: translate(-50%, -50%) rotate(-90deg);">
-    <circle id="lap-bg" cx="90" cy="90" r="80"></circle>
-    <circle id="lap-progress" cx="90" cy="90" r="80"></circle>
+  <!-- Lap progress circle closer and thinner -->
+  <svg style="position:absolute; top:50%; left:50%; width:200px; height:200px; transform: translate(-50%, -50%) rotate(-90deg);">
+    <circle id="lap-bg" cx="100" cy="100" r="90"></circle>
+    <circle id="lap-progress" cx="100" cy="100" r="90"></circle>
   </svg>
 
   <div id="timer">Loading</div>
@@ -110,15 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
         const drivers = data.lastRaceMessage.Drivers;
 
-        // DEBUG: see what drivers we got
-        console.log("Drivers from server:", drivers);
-
         // Pick P1 safely (Position may be string)
         const p1Driver = drivers.find(d => Number(d.Position) === 1);
-        if (!p1Driver) {
-          console.log("P1 not found!");
-          return;
-        }
+        if (!p1Driver) return;
 
         localRemainingSeconds = data.remainingSeconds;
 
@@ -126,14 +120,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const lapCount = Math.max(0, p1Driver.LapCount || 0);
         lapsEl.textContent = lapCount;
 
-        // Reset lap progress only if new lap
+        // Reset lap progress only if lapCount increased
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
         }
         lastLapCount = lapCount;
 
-        // Smooth target for lap circle (0-1)
-        lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0) / 100));
+        // Set target for lap circle (0-1)
+        lapProgressTarget = Math.max(0, Math.min(1, (p1Driver.LapProgress || 0)/100));
       }
 
       lastFetchTime = Date.now();
@@ -147,6 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
+    // Timer color alerts
     if (localRemainingSeconds <= 120) timerCircle.style.stroke = 'red';
     else if (localRemainingSeconds <= 240) timerCircle.style.stroke = 'orange';
     else timerCircle.style.stroke = 'green';
@@ -157,10 +152,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateLapVisual() {
-    // smooth interpolation every second
+    // Smooth interpolation
     const diff = lapProgressTarget - lapProgressCurrent;
-    lapProgressCurrent += diff * 0.2;
-    lapProgressCurrent = Math.min(lapProgressCurrent, lapProgressTarget);
+    lapProgressCurrent += diff * 0.5; // faster interpolation
+    if (Math.abs(lapProgressTarget - lapProgressCurrent) < 0.01) {
+      lapProgressCurrent = lapProgressTarget; // clamp to target
+    }
     lapCircle.style.strokeDasharray = `${lapCirc * lapProgressCurrent} ${lapCirc}`;
   }
 
@@ -170,7 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTimerVisual();
     updateLapVisual();
 
-    // fetch from server every 15s
+    // fetch server every 15s
     if (Date.now() - lastFetchTime >= fetchInterval) {
       await fetchTime();
     }
