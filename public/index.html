@@ -11,9 +11,9 @@
     align-items: center;
     height: 100vh;
     margin: 0;
-    background: #111;
+    background: #121212; /* slightly softer than pure black */
     color: white;
-    font-family: Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif;
   }
 
   #timer-container {
@@ -35,11 +35,22 @@
 
   /* Timer circle */
   #timer-bg { stroke: #333; stroke-width: 14; }
-  #timer-progress { stroke: green; stroke-width: 14; stroke-dasharray: 0 0; transition: stroke 0.3s linear, stroke-dasharray 0.3s linear; }
+  #timer-progress { 
+    stroke: green; 
+    stroke-width: 14; 
+    stroke-dasharray: 0 0; 
+    transition: stroke 0.3s linear, stroke-dasharray 0.3s linear;
+    filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
+  }
 
   /* Lap progress circle */
   #lap-bg { stroke: #333; stroke-width: 5; }
-  #lap-progress { stroke: #00BFFF; stroke-width: 5; stroke-dasharray: 0 0; } /* light blue */
+  #lap-progress { 
+    stroke: #00BFFF; 
+    stroke-width: 5; 
+    stroke-dasharray: 0 0;
+    filter: drop-shadow(0 0 2px rgba(0,191,255,0.5));
+  }
 
   #timer {
     position: absolute;
@@ -47,9 +58,9 @@
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 3em;
-    font-weight: 900; /* bolder for visibility */
+    font-weight: 700;
     text-align: center;
-    text-shadow: 1px 1px 2px black;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
   }
 
   #laps-completed {
@@ -58,8 +69,15 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 2em;
-    font-weight: 700; /* bolder */
-    text-shadow: 1px 1px 2px black;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+  }
+
+  /* Optional subtle pulse for lap completion */
+  @keyframes lapPulse {
+    0% { stroke-width: 5; }
+    50% { stroke-width: 8; }
+    100% { stroke-width: 5; }
   }
 </style>
 </head>
@@ -83,8 +101,8 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  let localRemainingSeconds = 15 * 60; // fallback
-  const fetchInterval = 5000; // fetch every 5s
+  let localRemainingSeconds = 15 * 60;
+  const fetchInterval = 5000;
   let lastFetchTime = 0;
 
   let lapProgressCurrent = 0;
@@ -112,8 +130,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.lastRaceMessage && data.lastRaceMessage.Drivers.length > 0) {
         const drivers = data.lastRaceMessage.Drivers;
-
-        // Pick P1
         const p1Driver = drivers.find(d => Number(d.Position) === 1);
         if (!p1Driver) return;
 
@@ -126,6 +142,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Reset lap progress if new lap
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
+          // optional subtle pulse for lap completion
+          lapCircle.style.animation = 'lapPulse 0.5s ease';
+          setTimeout(() => lapCircle.style.animation = '', 500);
         }
         lastLapCount = lapCount;
 
@@ -153,7 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateLapVisual() {
-    // Only update if difference > small threshold for efficiency
     const diff = lapProgressTarget - lapProgressCurrent;
     if (Math.abs(diff) > 0.01) {
       lapProgressCurrent += diff * 0.5;
@@ -165,12 +183,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   setInterval(async () => {
-    // Fetch server every 5 seconds
     if (Date.now() - lastFetchTime >= fetchInterval) {
       await fetchTime();
     }
 
-    // countdown timer locally
     localRemainingSeconds = Math.max(0, localRemainingSeconds - 1);
 
     updateTimerVisual();
