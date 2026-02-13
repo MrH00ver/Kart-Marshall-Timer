@@ -3,16 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kart Timer</title>
+<title>Kart Timer - Apple Watch Style</title>
 <style>
   body {
+    margin: 0;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    margin: 0;
-    background: #121212; /* slightly softer than pure black */
-    color: white;
+    background: #121212;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", sans-serif;
   }
 
@@ -33,23 +32,23 @@
     stroke-linecap: round;
   }
 
-  /* Timer circle */
+  /* Timer background & progress */
   #timer-bg { stroke: #333; stroke-width: 14; }
   #timer-progress { 
     stroke: green; 
     stroke-width: 14; 
     stroke-dasharray: 0 0; 
-    transition: stroke 0.3s linear, stroke-dasharray 0.3s linear;
-    filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
+    transition: stroke-dasharray 0.3s linear, stroke 0.3s linear;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.5));
   }
 
-  /* Lap progress circle */
+  /* Lap circle */
   #lap-bg { stroke: #333; stroke-width: 5; }
   #lap-progress { 
     stroke: #00BFFF; 
     stroke-width: 5; 
     stroke-dasharray: 0 0;
-    filter: drop-shadow(0 0 2px rgba(0,191,255,0.5));
+    filter: drop-shadow(0 0 3px rgba(0,191,255,0.5));
   }
 
   #timer {
@@ -60,7 +59,7 @@
     font-size: 3em;
     font-weight: 700;
     text-align: center;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
   }
 
   #laps-completed {
@@ -70,14 +69,14 @@
     transform: translateX(-50%);
     font-size: 2em;
     font-weight: 600;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
   }
 
-  /* Optional subtle pulse for lap completion */
+  /* Subtle lap pulse */
   @keyframes lapPulse {
-    0% { stroke-width: 5; }
-    50% { stroke-width: 8; }
-    100% { stroke-width: 5; }
+    0% { stroke-width: 5; opacity: 1; }
+    50% { stroke-width: 8; opacity: 0.7; }
+    100% { stroke-width: 5; opacity: 1; }
   }
 </style>
 </head>
@@ -142,7 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // Reset lap progress if new lap
         if (lastLapCount !== null && lapCount > lastLapCount) {
           lapProgressCurrent = 0;
-          // optional subtle pulse for lap completion
           lapCircle.style.animation = 'lapPulse 0.5s ease';
           setTimeout(() => lapCircle.style.animation = '', 500);
         }
@@ -162,9 +160,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const progress = Math.max(0, Math.min(1, localRemainingSeconds / totalSessionSeconds));
     timerCircle.style.strokeDasharray = `${timerCirc * progress} ${timerCirc}`;
 
+    // Gradient-like effect: green → orange → red
     if (localRemainingSeconds <= 120) timerCircle.style.stroke = 'red';
     else if (localRemainingSeconds <= 240) timerCircle.style.stroke = 'orange';
-    else timerCircle.style.stroke = 'green';
+    else timerCircle.style.stroke = 'limegreen';
 
     const minutes = Math.floor(localRemainingSeconds / 60);
     const seconds = localRemainingSeconds % 60;
